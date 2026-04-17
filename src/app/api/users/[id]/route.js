@@ -1,5 +1,5 @@
 import { verifyJwt, getJwtFromRequest } from '@/lib/session';
-import { toggleUserActive } from '@/lib/repositories/users';
+import { toggleUserActive, isUserOnGestorTeam } from '@/lib/repositories/users';
 import { uuidParamSchema } from '@/schemas/api';
 
 export const runtime = 'nodejs';
@@ -15,6 +15,15 @@ export async function PATCH(request, { params }) {
   const parsed = uuidParamSchema.safeParse({ id });
   if (!parsed.success) {
     return Response.json({ error: 'ID inválido.' }, { status: 400 });
+  }
+
+  if (id === session.sub) {
+    return Response.json({ error: 'Gestor não pode inativar a própria conta.' }, { status: 403 });
+  }
+
+  const owns = await isUserOnGestorTeam(session.sub, id);
+  if (!owns) {
+    return Response.json({ error: 'Usuário não encontrado.' }, { status: 404 });
   }
 
   try {

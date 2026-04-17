@@ -7,12 +7,14 @@ export async function createAnalysis(data) {
 
   const rows = await sql`
     INSERT INTO analyses (
+      user_id,
       corretor_nome, cliente_ref, conversa_raw, resultado, resultado_registrado_em,
       perfil_jung, perfil_momento, contexto_temporal, tendencia,
       perfil_natural_vendedor, aderencia_cliente, fase1_nota, fase2_nota, risco_perda,
       client_data, vendor_data, signals_data, sir_data,
       prompt_version, model_used
     ) VALUES (
+      ${data.userId         ?? null},
       ${data.corretorNome   ?? null},
       ${data.clienteRef     ?? null},
       ${data.conversaRaw},

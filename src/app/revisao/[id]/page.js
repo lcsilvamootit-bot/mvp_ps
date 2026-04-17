@@ -14,11 +14,8 @@ const AVA_OPTIONS = [
   { value: 'errado',        label: 'Errado' },
 ];
 
-const RESULTADO_LABEL = {
-  fechada:      { label: 'Fechada',       color: 'bg-green-100 text-green-800' },
-  perdida:      { label: 'Perdida',       color: 'bg-red-100 text-red-800' },
-  em_andamento: { label: 'Em andamento',  color: 'bg-yellow-100 text-yellow-800' },
-};
+import { RESULTADO_LABEL } from '@/lib/analysisConstants';
+import { formatDateTime } from '@/lib/utils';
 
 const NOTA_COLOR = {
   Acertou: 'text-green-700 bg-green-100',
@@ -31,15 +28,6 @@ const RISCO_COLOR = {
   Média: 'text-yellow-700',
   Baixa: 'text-green-700',
 };
-
-function formatDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-    timeZone: 'America/Sao_Paulo',
-  });
-}
 
 function Badge({ label, colorClass }) {
   return (
@@ -228,7 +216,7 @@ export default function AnalysisPage({ params }) {
         <div className="bg-white rounded-xl border border-gray-100 px-5 py-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-xs text-gray-400 mb-1">{formatDate(analysis.createdAt)}</p>
+              <p className="text-xs text-gray-400 mb-1">{formatDateTime(analysis.createdAt)}</p>
               <p className="text-sm font-semibold text-gray-800">
                 {analysis.corretorNome ?? 'Corretor desconhecido'}
                 {analysis.clienteRef && <span className="font-normal text-gray-500"> · {analysis.clienteRef}</span>}
@@ -391,7 +379,7 @@ export default function AnalysisPage({ params }) {
               {analysis.reviewId ? 'Atualizar Avaliação' : 'Avaliar Análise'}
             </h2>
             {analysis.reviewId && (
-              <p className="text-xs text-blue-600 mt-0.5">Revisado em {formatDate(analysis.reviewCreatedAt)}</p>
+              <p className="text-xs text-blue-600 mt-0.5">Revisado em {formatDateTime(analysis.reviewCreatedAt)}</p>
             )}
           </div>
           <div className="px-5 py-5 space-y-6">

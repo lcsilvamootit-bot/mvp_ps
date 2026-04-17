@@ -3,8 +3,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Redireciona para o painel correto baseado na sessão ativa.
-// O middleware já garante que o usuário está autenticado.
 export default function DashboardPage() {
   const router = useRouter();
 

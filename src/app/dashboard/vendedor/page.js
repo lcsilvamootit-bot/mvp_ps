@@ -3,21 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-const RESULTADO_LABEL = {
-  fechada:      { label: 'Fechada',      color: 'bg-green-100 text-green-800' },
-  perdida:      { label: 'Perdida',      color: 'bg-red-100 text-red-800' },
-  em_andamento: { label: 'Em andamento', color: 'bg-yellow-100 text-yellow-800' },
-  resgate_bem_sucedido: { label: 'Resgate ✓', color: 'bg-emerald-100 text-emerald-800' },
-  resgate_frustrado:    { label: 'Resgate ✗', color: 'bg-orange-100 text-orange-800' },
-};
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo',
-  });
-}
+import { RESULTADO_LABEL } from '@/lib/analysisConstants';
+import { formatDateTime } from '@/lib/utils';
 
 export default function VendedorPage() {
   const router = useRouter();
@@ -110,7 +97,7 @@ export default function VendedorPage() {
                   const r = RESULTADO_LABEL[a.resultado] ?? { label: a.resultado, color: 'bg-slate-100 text-slate-600' };
                   return (
                     <tr key={a.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(a.createdAt)}</td>
+                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDateTime(a.createdAt)}</td>
                       <td className="px-4 py-3 text-slate-700">{a.clienteRef ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-700">{a.perfilJung ?? '—'}</td>
                       <td className="px-4 py-3">

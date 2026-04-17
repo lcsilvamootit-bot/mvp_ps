@@ -112,6 +112,18 @@ export async function listVendedoresByGestor(gestorId) {
   return toCamelAll(rows);
 }
 
+export async function isUserOnGestorTeam(gestorId, userId) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT 1
+    FROM team_members tm
+    JOIN teams t ON t.id = tm.team_id
+    WHERE t.gestor_id = ${gestorId} AND tm.user_id = ${userId}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 export async function gestorExists() {
   const sql = getDb();
   const rows = await sql`SELECT 1 FROM users WHERE role = 'gestor' LIMIT 1`;
@@ -135,19 +147,15 @@ export async function createInviteToken(userId) {
 
 export async function findAndConsumeInviteToken(token) {
   const sql = getDb();
+  // UPDATE atômico evita TOCTOU: marca como usado e retorna user_id em uma operação
   const rows = await sql`
-    SELECT id, user_id, expires_at
-    FROM auth_tokens
+    UPDATE auth_tokens
+    SET used_at = NOW()
     WHERE token = ${token}
       AND type = 'invite'
       AND used_at IS NULL
       AND expires_at > NOW()
-    LIMIT 1
+    RETURNING user_id
   `;
-  if (!rows[0]) return null;
-
-  await sql`
-    UPDATE auth_tokens SET used_at = NOW() WHERE id = ${rows[0].id}
-  `;
-  return rows[0].user_id;
+  return rows[0]?.user_id ?? null;
 }

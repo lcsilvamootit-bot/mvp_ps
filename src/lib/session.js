@@ -1,6 +1,10 @@
 import { SignJWT, jwtVerify } from 'jose';
 
-const getKey = () => new TextEncoder().encode(process.env.SESSION_SECRET);
+const getKey = () => {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error('[session] SESSION_SECRET não configurada.');
+  return new TextEncoder().encode(secret);
+};
 const ALG = 'HS256';
 
 export async function signSession(payload) {

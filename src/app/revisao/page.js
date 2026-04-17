@@ -3,27 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-
-const RESULTADO_LABEL = {
-  fechada:   { label: 'Fechada',   color: 'bg-green-100 text-green-800' },
-  perdida:   { label: 'Perdida',   color: 'bg-red-100 text-red-800' },
-  em_andamento: { label: 'Em andamento', color: 'bg-yellow-100 text-yellow-800' },
-};
-
-const TENDENCIA_COLOR = {
-  'Avançando': 'text-green-700',
-  'Estagnado': 'text-yellow-700',
-  'Em risco':  'text-orange-700',
-  'Perdido':   'text-red-700',
-};
-
-function formatDate(iso) {
-  return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-    timeZone: 'America/Sao_Paulo',
-  });
-}
+import { RESULTADO_LABEL, TENDENCIA_COLOR } from '@/lib/analysisConstants';
+import { formatDateTime } from '@/lib/utils';
 
 export default function RevisaoPage() {
   const router = useRouter();
@@ -122,7 +103,7 @@ export default function RevisaoPage() {
                       onClick={() => router.push(`/revisao/${a.id}`)}
                       className="hover:bg-blue-50 cursor-pointer transition-colors"
                     >
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(a.createdAt)}</td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(a.createdAt)}</td>
                       <td className="px-4 py-3 text-gray-800">{a.corretorNome ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-800">{a.clienteRef ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-700">{a.perfilJung ?? '—'}</td>

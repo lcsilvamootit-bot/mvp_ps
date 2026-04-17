@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { verifyJwt, getJwtFromRequest } from '@/lib/session';
 import {

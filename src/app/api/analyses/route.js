@@ -7,7 +7,6 @@ import { getTeamMemberIds } from '@/lib/repositories/users';
 export const runtime = 'nodejs';
 
 export async function GET(request) {
-  // Aceita sessão do psicólogo (HMAC) ou sessão JWT (gestor/vendedor)
   const psychToken = getSessionFromRequest(request);
   const isPsych = await verifySessionToken(psychToken);
 
@@ -19,7 +18,10 @@ export async function GET(request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const pagination = paginationSchema.parse(Object.fromEntries(searchParams));
+  const paginationParsed = paginationSchema.safeParse(Object.fromEntries(searchParams));
+  if (!paginationParsed.success) {
+    return Response.json({ error: 'Parâmetros inválidos.' }, { status: 400 });
+  }
   const pendente = searchParams.get('pendente') === 'true';
 
   let userIds = null;
@@ -30,7 +32,7 @@ export async function GET(request) {
   }
 
   try {
-    const analyses = await listAnalyses({ pendente, ...pagination, userIds });
+    const analyses = await listAnalyses({ pendente, ...paginationParsed.data, userIds });
     return Response.json(analyses);
   } catch (err) {
     console.error('[GET /api/analyses]', err.message);
@@ -48,8 +50,14 @@ export async function POST(request) {
   const { corretorNome, clienteRef, conversaRaw, resultado,
           clientData, vendorData, signalsData, sirData } = parsed.data;
 
+  // Extrai user_id do JWT se o vendedor estiver autenticado
+  const jwtToken = getJwtFromRequest(request);
+  const jwtSession = await verifyJwt(jwtToken);
+  const userId = jwtSession?.role === 'vendedor' ? jwtSession.sub : null;
+
   try {
     const analysis = await createAnalysis({
+      userId,
       corretorNome,
       clienteRef,
       conversaRaw,

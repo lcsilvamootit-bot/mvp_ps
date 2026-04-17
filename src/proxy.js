@@ -43,8 +43,24 @@ export async function proxy(request) {
     return NextResponse.next();
   }
 
-  // APIs — passam sem verificação de ACCESS_TOKEN no middleware
-  // (cada route handler decide sua própria autenticação)
+  // /api/analyze e /api/rescue — pipelines OpenAI: requer ACCESS_TOKEN ou JWT
+  if (pathname === '/api/analyze' || pathname === '/api/rescue') {
+    const validToken = process.env.ACCESS_TOKEN;
+    const cookieToken = request.cookies.get('access_token')?.value;
+    const headerToken = request.headers.get('x-access-token');
+    const hasAccessToken = !validToken || cookieToken === validToken || headerToken === validToken;
+
+    if (!hasAccessToken) {
+      const jwtToken = request.cookies.get('session')?.value;
+      const jwtSession = await verifyJwt(jwtToken);
+      if (!jwtSession) {
+        return NextResponse.json({ error: 'Acesso restrito.' }, { status: 403 });
+      }
+    }
+    return NextResponse.next();
+  }
+
+  // Demais APIs — cada route handler decide sua própria autenticação
   if (pathname.startsWith('/api')) {
     return NextResponse.next();
   }

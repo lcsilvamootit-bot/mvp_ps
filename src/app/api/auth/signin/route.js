@@ -1,16 +1,22 @@
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { signSession, sessionCookieHeader } from '@/lib/session';
 import { findUserByEmail, getTeamIdsByUser } from '@/lib/repositories/users';
 
 export const runtime = 'nodejs';
 
+const signinSchema = z.object({
+  email:    z.string().email(),
+  password: z.string().min(1),
+});
+
 export async function POST(request) {
   const body = await request.json().catch(() => ({}));
-  const { email, password } = body;
-
-  if (!email || !password) {
+  const parsed = signinSchema.safeParse(body);
+  if (!parsed.success) {
     return Response.json({ error: 'Email e senha são obrigatórios.' }, { status: 400 });
   }
+  const { email, password } = parsed.data;
 
   const user = await findUserByEmail(email).catch(() => null);
 
