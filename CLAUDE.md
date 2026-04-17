@@ -30,9 +30,13 @@ AI-powered sales intelligence tool. A salesperson pastes a WhatsApp conversation
 
 ---
 
-## Access Control (Current V1 Guard)
+## Access Control
 
-`src/proxy.js` is the **middleware** (not `middleware.ts`). It gates all routes via a shared token in `ACCESS_TOKEN` env var. Token is passed as `?token=` on first visit, then persisted in a `httpOnly` cookie. API routes require `x-access-token` header or cookie. No JWT auth yet — that's V2.
+Two layers:
+
+1. **Salesperson guard** — `src/proxy.js` (not `middleware.ts`). Gates all routes via `ACCESS_TOKEN` env var. Token passed as `?token=` on first visit, persisted in `httpOnly` cookie.
+
+2. **Psychologist session** — HMAC-SHA256 token, 8h TTL, stored in `psych_session` cookie. Login at `POST /api/auth/login` checks `PSYCHOLOGIST_PASSWORD`. Session helpers are in `src/lib/auth.js`: `createSessionToken()`, `verifySessionToken()`, `getSessionFromRequest()`. Protected routes call `verifySessionToken(getSessionFromRequest(request))` at the top before any logic.
 
 ---
 
@@ -58,16 +62,22 @@ Separate endpoint: `POST /api/rescue` — generates rescue plan from already-com
 
 ---
 
-## Schemas (`src/schemas/index.js`)
+## Schemas
 
-Five Zod schemas that define GPT response shapes:
+Two schema files with distinct purposes:
+
+**`src/schemas/index.js`** — Zod schemas for GPT structured outputs (`zodResponseFormat`):
 - `clientAnalysisSchema` — Jung profile + purchase moment + temporal context + approach guidance
 - `vendorAnalysisSchema` — natural profile + phase 1/2 evaluation + verdict
 - `signalsSchema` — loss signals, advance signals, trend, critical moment
 - `sirSchema` — final recommendations + ready-to-send message
 - `rescueSchema` — rescue plan: cause, ideal profile, timing window, approach, ready message
 
-These schemas are also the ground truth for what data gets stored in the DB (as JSONB columns).
+These are also the ground truth for what data gets stored in the DB (as JSONB columns).
+
+**`src/schemas/api.js`** — Zod schemas for API request validation:
+- `saveAnalysisSchema`, `saveReviewSchema`, `saveRescueSchema` — request body validation
+- `paginationSchema`, `uuidParamSchema` — reusable param validators
 
 ---
 
@@ -84,18 +94,24 @@ The page calls `fetch('/api/analyze', { method: 'POST', body: formData })` then 
 - All API routes: `export const runtime = 'nodejs'` — never Edge Runtime
 - SSE: use `TransformStream` (not `ReadableStream` directly) — this is the pattern established in `analyze/route.js`
 - `safeStringify`: replaces non-ASCII chars with `\uXXXX` escapes — required for SSE JSON payloads to avoid encoding issues
-- DB (when added): use `@neondatabase/serverless` — HTTP/WebSocket driver required for Vercel serverless. Never `postgres.js` (TCP only)
+- DB: use `@neondatabase/serverless` via `getDb()` singleton in `src/lib/db.js` — HTTP/WebSocket driver required for Vercel serverless. Never `postgres.js` (TCP only)
 
 ---
 
+## Workspace Settings
+
+`src/lib/workspace.js` reads/writes a `workspace_settings` table (single row). Fields: `setor`, `produto`, `ticketMedio`, `cicloDecisao`, `perfilCliente`, `concorrentes`, `objecoes`, `observacao`. The `buildContextBlock()` function formats this into a prompt prefix injected into GPT calls to calibrate analysis for a specific business context.
+
+Managed via `GET/POST /api/settings` (requires psych session) and the UI at `/revisao/configuracoes`.
+
 ---
 
-## Planned Next — V1 Prototype
+## Key Env Vars
 
-Database schema and sprint plan are in `docs/planejamento_v1.md`. Sprint order:
-1. Neon PostgreSQL setup: install `@neondatabase/serverless`, create `src/lib/db.js`, run DDL
-2. `POST /api/analyses` + `PATCH /api/analyses/[id]/resultado` — save analysis + mark outcome
-3. HMAC auth for psychologist panel (no JWT — use `crypto.subtle`, Edge-safe)
-4. Psychologist review panel at `/revisao` and `/revisao/[id]`
-
-Key env vars needed: `DATABASE_URL` (auto-injected by Vercel Neon integration), `OPENAI_API_KEY`, `ACCESS_TOKEN`, `PSYCH_SECRET`.
+| Var | Purpose |
+|-----|---------|
+| `DATABASE_URL` | Neon PostgreSQL (auto-injected by Vercel Neon integration) |
+| `OPENAI_API_KEY` | GPT-4o + Whisper |
+| `ACCESS_TOKEN` | Salesperson access guard |
+| `SESSION_SECRET` | HMAC key for psychologist session tokens |
+| `PSYCHOLOGIST_PASSWORD` | Password checked at login |
