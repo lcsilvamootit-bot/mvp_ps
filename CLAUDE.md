@@ -30,13 +30,49 @@ AI-powered sales intelligence tool. A salesperson pastes a WhatsApp conversation
 
 ---
 
-## Access Control
+## Access Control (V2)
 
-Two layers:
+### JWT Sessions
 
-1. **Salesperson guard** — `src/proxy.js` (not `middleware.ts`). Gates all routes via `ACCESS_TOKEN` env var. Token passed as `?token=` on first visit, persisted in `httpOnly` cookie.
+`src/lib/session.js` — all session logic lives here (replaces the deleted `src/lib/auth.js`):
+- `signSession(payload)` — signs a JWT (HS256, 1h TTL) with `SESSION_SECRET`
+- `verifyJwt(token)` — verifies and returns payload, or `null`
+- `sessionCookieHeader(token)` / `clearSessionCookieHeader()` — build `Set-Cookie` strings
+- `getJwtFromRequest(request)` — reads `session` cookie from any request object
 
-2. **Psychologist session** — HMAC-SHA256 token, 8h TTL, stored in `psych_session` cookie. Login at `POST /api/auth/login` checks `PSYCHOLOGIST_PASSWORD`. Session helpers are in `src/lib/auth.js`: `createSessionToken()`, `verifySessionToken()`, `getSessionFromRequest()`. Protected routes call `verifySessionToken(getSessionFromRequest(request))` at the top before any logic.
+JWT payload shape: `{ sub: userId, role, name, teamIds, mustChangePassword }`
+
+Roles: `gestor` | `vendedor` | `psicologo`
+
+### Proxy routing (`src/proxy.js`)
+
+| Path | Rule |
+|------|------|
+| `/acesso`, `/primeiro-acesso`, `/login` | Public |
+| `/api/auth/*` | Public |
+| `/dashboard/*` | Requires valid JWT; redirects to `/primeiro-acesso` if `mustChangePassword` |
+| `/revisao/*` | Requires JWT with `role === 'psicologo'` |
+| `/api/analyze`, `/api/rescue` | Requires `ACCESS_TOKEN` cookie/header **or** valid JWT |
+| Other `/api/*` | Each route handler decides its own auth |
+| Other pages | `ACCESS_TOKEN` guard (`?token=` on first visit → `access_token` cookie) |
+
+### Auth endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/auth/signin` | Email + password → JWT cookie |
+| `POST /api/auth/signout` | Clears `session` cookie |
+| `GET /api/auth/me` | Returns `{ authenticated, role, name }` from current JWT |
+| `POST /api/auth/seed` | One-time setup: creates first gestor or psicologo (requires `SEED_KEY`) |
+| `POST /api/auth/primeiro-acesso` | Sets password via invite token (72h, single-use) |
+
+### User & team model
+
+Tables: `users`, `teams` (one per gestor), `team_members`, `auth_tokens` (type: `invite` | `reset`).
+
+Repositories in `src/lib/repositories/users.js`: `createUser`, `findUserByEmail`, `findUserById`, `setPassword`, `toggleUserActive`, `createInviteToken`, `findAndConsumeInviteToken`, `listVendedoresByGestor`, `ensureGestorTeam`, `addUserToTeam`.
+
+`findAndConsumeInviteToken` uses an atomic `UPDATE … RETURNING` to avoid TOCTOU race on single-use tokens.
 
 ---
 
@@ -113,5 +149,5 @@ Managed via `GET/POST /api/settings` (requires psych session) and the UI at `/re
 | `DATABASE_URL` | Neon PostgreSQL (auto-injected by Vercel Neon integration) |
 | `OPENAI_API_KEY` | GPT-4o + Whisper |
 | `ACCESS_TOKEN` | Salesperson access guard |
-| `SESSION_SECRET` | HMAC key for psychologist session tokens |
-| `PSYCHOLOGIST_PASSWORD` | Password checked at login |
+| `SESSION_SECRET` | HMAC key for JWT session signing (`jose` HS256) |
+| `SEED_KEY` | One-time key for `POST /api/auth/seed` — disable after setup |
