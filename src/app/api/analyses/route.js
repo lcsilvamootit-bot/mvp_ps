@@ -1,7 +1,27 @@
-import { createAnalysis } from '@/lib/repositories/analyses';
-import { saveAnalysisSchema } from '@/schemas/api';
+import { createAnalysis, listAnalyses } from '@/lib/repositories/analyses';
+import { saveAnalysisSchema, paginationSchema } from '@/schemas/api';
+import { verifySessionToken, getSessionFromRequest } from '@/lib/auth';
 
 export const runtime = 'nodejs';
+
+export async function GET(request) {
+  const token = getSessionFromRequest(request);
+  if (!await verifySessionToken(token)) {
+    return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const pagination = paginationSchema.parse(Object.fromEntries(searchParams));
+  const pendente = searchParams.get('pendente') === 'true';
+
+  try {
+    const analyses = await listAnalyses({ pendente, ...pagination });
+    return Response.json(analyses);
+  } catch (err) {
+    console.error('[GET /api/analyses]', err.message);
+    return Response.json({ error: 'Erro ao listar análises.' }, { status: 500 });
+  }
+}
 
 export async function POST(request) {
   const body = await request.json();

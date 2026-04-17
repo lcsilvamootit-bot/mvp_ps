@@ -53,12 +53,55 @@ export async function saveRescuePlan(id, rescuePlan) {
 export async function findAnalysisById(id) {
   const sql = getDb();
   const rows = await sql`
-    SELECT a.*, pr.jung_avaliacao, pr.observacao
+    SELECT
+      a.*,
+      pr.id              AS review_id,
+      pr.reviewer_nome,
+      pr.jung_avaliacao, pr.jung_correto,
+      pr.momento_avaliacao, pr.momento_correto,
+      pr.contexto_avaliacao, pr.contexto_correto,
+      pr.observacao      AS review_observacao,
+      pr.created_at      AS review_created_at
     FROM analyses a
     LEFT JOIN psych_reviews pr ON pr.analysis_id = a.id
     WHERE a.id = ${id} AND a.deleted_at IS NULL
   `;
   return rows[0] ? toCamel(rows[0]) : null;
+}
+
+export async function saveReview(analysisId, data) {
+  const sql = getDb();
+  const rows = await sql`
+    INSERT INTO psych_reviews (
+      analysis_id, reviewer_nome,
+      jung_avaliacao, jung_correto,
+      momento_avaliacao, momento_correto,
+      contexto_avaliacao, contexto_correto,
+      observacao
+    ) VALUES (
+      ${analysisId},
+      ${data.reviewerNome   ?? null},
+      ${data.jungAvaliacao},
+      ${data.jungCorreto    ?? null},
+      ${data.momentoAvaliacao},
+      ${data.momentoCorreto ?? null},
+      ${data.contextoAvaliacao},
+      ${data.contextoCorreto ?? null},
+      ${data.observacao     ?? null}
+    )
+    ON CONFLICT (analysis_id) DO UPDATE SET
+      reviewer_nome      = EXCLUDED.reviewer_nome,
+      jung_avaliacao     = EXCLUDED.jung_avaliacao,
+      jung_correto       = EXCLUDED.jung_correto,
+      momento_avaliacao  = EXCLUDED.momento_avaliacao,
+      momento_correto    = EXCLUDED.momento_correto,
+      contexto_avaliacao = EXCLUDED.contexto_avaliacao,
+      contexto_correto   = EXCLUDED.contexto_correto,
+      observacao         = EXCLUDED.observacao,
+      updated_at         = NOW()
+    RETURNING id
+  `;
+  return rows.length > 0;
 }
 
 export async function listAnalyses({ pendente = false, page = 1, limit = 20 } = {}) {

@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+export const saveReviewSchema = z.object({
+  reviewerNome:      z.string().max(120).optional(),
+  jungAvaliacao:     z.enum(['correto', 'parcialmente', 'errado']),
+  jungCorreto:       z.enum(['Pragmático', 'Analítico', 'Afável', 'Expressivo']).optional().nullable(),
+  momentoAvaliacao:  z.enum(['correto', 'parcialmente', 'errado']),
+  momentoCorreto:    z.enum(['Indeciso', 'Confuso', 'Decidido', 'Crítico', 'Nervoso', 'Apressado', 'Negociador', 'Detalhista', 'Informal']).optional().nullable(),
+  contextoAvaliacao: z.enum(['correto', 'parcialmente', 'errado']),
+  contextoCorreto:   z.enum(['Ativo', 'Resgate', 'Follow-up', 'Indefinido']).optional().nullable(),
+  observacao:        z.string().max(2000).optional().nullable(),
+});
+
 export const saveAnalysisSchema = z.object({
   corretorNome:  z.string().max(120).optional(),
   clienteRef:    z.string().max(120).optional(),
