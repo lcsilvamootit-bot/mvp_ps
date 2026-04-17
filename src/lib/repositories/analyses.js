@@ -104,14 +104,31 @@ export async function saveReview(analysisId, data) {
   return rows.length > 0;
 }
 
-export async function listAnalyses({ pendente = false, page = 1, limit = 20 } = {}) {
+export async function listAnalyses({ pendente = false, page = 1, limit = 20, userIds = null } = {}) {
   const sql = getDb();
   const offset = (page - 1) * limit;
+
+  if (userIds !== null) {
+    if (userIds.length === 0) return [];
+    const rows = await sql`
+      SELECT a.id, a.corretor_nome, a.cliente_ref, a.resultado,
+             a.perfil_jung, a.tendencia, a.created_at,
+             (pr.id IS NOT NULL) AS tem_review
+      FROM analyses a
+      LEFT JOIN psych_reviews pr ON pr.analysis_id = a.id
+      WHERE a.deleted_at IS NULL
+        AND (${pendente}::boolean = false OR pr.id IS NULL)
+        AND a.user_id = ANY(${userIds})
+      ORDER BY a.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    return toCamelAll(rows);
+  }
+
   const rows = await sql`
-    SELECT
-      a.id, a.corretor_nome, a.cliente_ref, a.resultado,
-      a.perfil_jung, a.tendencia, a.created_at,
-      (pr.id IS NOT NULL) AS tem_review
+    SELECT a.id, a.corretor_nome, a.cliente_ref, a.resultado,
+           a.perfil_jung, a.tendencia, a.created_at,
+           (pr.id IS NOT NULL) AS tem_review
     FROM analyses a
     LEFT JOIN psych_reviews pr ON pr.analysis_id = a.id
     WHERE a.deleted_at IS NULL
