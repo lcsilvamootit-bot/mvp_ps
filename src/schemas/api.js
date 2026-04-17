@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const saveReviewSchema = z.object({
-  reviewerNome:      z.string().max(120).optional(),
+  reviewerNome:      z.string().max(120).optional().nullable(),
   jungAvaliacao:     z.enum(['correto', 'parcialmente', 'errado']),
   jungCorreto:       z.enum(['Pragmático', 'Analítico', 'Afável', 'Expressivo']).optional().nullable(),
   momentoAvaliacao:  z.enum(['correto', 'parcialmente', 'errado']),
