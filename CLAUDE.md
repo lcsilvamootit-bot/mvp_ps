@@ -44,7 +44,9 @@ JWT payload shape: `{ sub: userId, role, name, teamIds, mustChangePassword }`
 
 Roles: `gestor` | `vendedor` | `psicologo`
 
-### Proxy routing (`src/proxy.js`)
+### Proxy routing (`src/proxy.js` → wired via `src/middleware.js`)
+
+`src/proxy.js` contains the routing logic and exports `proxy` + `config`. Next.js requires a default export named `middleware` in `src/middleware.js` — that file must import and re-export `proxy` as the default.
 
 | Path | Rule |
 |------|------|
@@ -117,11 +119,26 @@ These are also the ground truth for what data gets stored in the DB (as JSONB co
 
 ---
 
-## UI (`src/app/page.js`)
+## Pages
 
-Single-file client component (~1150 lines). Uses SSE to stream pipeline results in real-time. Renders collapsible section bands per pipeline step as data arrives. Contains inline sub-components (`CopyButton`, `Accordion`, `SectionShell`, profile bands).
+**Main analysis UI** (`src/app/page.js`) — Single-file client component (~1150 lines). Uses SSE to stream pipeline results in real-time. Renders collapsible section bands per pipeline step as data arrives. Contains inline sub-components (`CopyButton`, `Accordion`, `SectionShell`, profile bands). Calls `fetch('/api/analyze', { method: 'POST', body: formData })` then reads the SSE stream via `ReadableStream` + `TextDecoder`. No state management library — plain `useState`/`useRef`.
 
-The page calls `fetch('/api/analyze', { method: 'POST', body: formData })` then reads the SSE stream via `ReadableStream` + `TextDecoder`. No state management library — plain `useState`/`useRef`.
+**Auth pages** live under `src/app/(acesso)/` route group (URL has no `(acesso)` prefix):
+- `acesso/page.js` — login form for gestor/vendedor/psicologo
+- `primeiro-acesso/page.js` — invite token → set password flow
+
+**Dashboard** (`src/app/dashboard/`):
+- `page.js` — role-based redirect (gestor → `/dashboard/gestor`, vendedor → `/dashboard/vendedor`)
+- `gestor/page.js` — gestor's analysis list
+- `gestor/equipe/page.js` — team member list
+- `gestor/equipe/novo/page.js` — invite new vendedor
+- `vendedor/page.js` — vendedor's own analysis list
+- `layout.js` — shared dashboard layout with nav
+
+**Psychologist panel** (`src/app/revisao/`):
+- `page.js` — pending reviews list
+- `[id]/page.js` — review an individual analysis
+- `configuracoes/page.js` — workspace settings form
 
 ---
 
@@ -131,6 +148,8 @@ The page calls `fetch('/api/analyze', { method: 'POST', body: formData })` then 
 - SSE: use `TransformStream` (not `ReadableStream` directly) — this is the pattern established in `analyze/route.js`
 - `safeStringify`: replaces non-ASCII chars with `\uXXXX` escapes — required for SSE JSON payloads to avoid encoding issues
 - DB: use `@neondatabase/serverless` via `getDb()` singleton in `src/lib/db.js` — HTTP/WebSocket driver required for Vercel serverless. Never `postgres.js` (TCP only)
+- OpenAI: use `getOpenAI()` singleton in `src/lib/openai.js` — same lazy-init pattern as `getDb()`
+- UI label/color maps for `resultado` and `tendencia` values live in `src/lib/analysisConstants.js` (`RESULTADO_LABEL`, `TENDENCIA_COLOR`)
 
 ---
 

@@ -217,15 +217,15 @@ const SALT_ROUNDS = 12
 
 ```
 src/lib/
-  db.js          → singleton do cliente Neon
-  session.js     → encrypt/decrypt JWT (server-only)
-  dal.js         → verifySession(), verifyRole() com React.cache
-  auth.js        → createSessionToken(), verifySessionToken()
-  rateLimit.js   → checkRateLimit() com fallback in-memory
-  actions/
-    auth.js      → Server Actions: login, logout, trocarSenha
-    recovery.js  → Server Actions: esqueci-senha, redefinir-senha
-    gestores.js  → Server Actions: criarVendedor, toggleAtivo
+  db.js                    → singleton do cliente Neon (getDb)
+  openai.js                → singleton do cliente OpenAI (getOpenAI)
+  session.js               → JWT sign/verify + cookie helpers (server-only)
+  workspace.js             → leitura/escrita de workspace_settings + buildContextBlock()
+  analysisConstants.js     → RESULTADO_LABEL, TENDENCIA_COLOR (UI)
+  utils.js                 → toCamel, toCamelAll, truncate, formatDate, formatDateTime
+  repositories/
+    analyses.js            → createAnalysis, findAnalysisById, listAnalyses, saveReview, saveRescuePlan
+    users.js               → createUser, findUserByEmail, findUserById, setPassword, …
 ```
 
 ---
