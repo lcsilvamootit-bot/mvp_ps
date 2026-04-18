@@ -739,7 +739,75 @@ const queryParsed = paginationSchema.safeParse(
 
 ---
 
-## 9. O Que Nunca Fazer
+## 9. Segurança
+
+### Modelo de autenticação (V1)
+
+Dois perfis de acesso, cada um com seu mecanismo:
+
+| Perfil | Cookie | Verificação |
+|--------|--------|-------------|
+| Vendedor | `access_token` | Compara com `ACCESS_TOKEN` env var |
+| Psicólogo | `psych_session` | HMAC-SHA256, 8h TTL — `verifySessionToken()` em `src/lib/auth.js` |
+
+Helpers disponíveis em `src/lib/auth.js`:
+
+```js
+verifySessionToken(token)       // psicólogo — retorna boolean
+getSessionFromRequest(request)  // extrai psych_session do cookie
+checkAccessToken(request)       // vendedor — compara access_token com env var
+isAuthenticated(request)        // aceita qualquer um dos dois — usar em endpoints mistos
+```
+
+### Guarda obrigatória em todo route handler
+
+**Regra:** verificação de autenticação é **sempre a primeira coisa** do handler, antes de qualquer leitura de body ou lógica.
+
+```js
+// Somente psicólogo
+export async function GET(request) {
+  if (!await verifySessionToken(getSessionFromRequest(request))) {
+    return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+  }
+  // ...
+}
+
+// Vendedor OU psicólogo (endpoints de criação/atualização de análise)
+export async function POST(request) {
+  if (!await isAuthenticated(request)) {
+    return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+  }
+  // ...
+}
+```
+
+### Quem acessa o quê
+
+| Endpoint | Vendedor | Psicólogo |
+|----------|----------|-----------|
+| `POST /api/analyze` | ✓ (proxy) | ✓ (proxy) |
+| `POST /api/rescue` | ✓ (proxy) | ✓ (proxy) |
+| `POST /api/analyses` | ✓ `isAuthenticated` | ✓ `isAuthenticated` |
+| `PATCH /api/analyses/[id]` | ✓ `isAuthenticated` | ✓ `isAuthenticated` |
+| `POST /api/analyses/[id]/rescue` | ✓ `isAuthenticated` | ✓ `isAuthenticated` |
+| `GET /api/analyses` | ✗ | ✓ `verifySessionToken` |
+| `GET /api/analyses/[id]` | ✗ | ✓ `verifySessionToken` |
+| `POST /api/analyses/[id]/review` | ✗ | ✓ `verifySessionToken` |
+| `GET/POST /api/settings` | ✗ | ✓ `verifySessionToken` |
+
+### Regras de segurança
+
+- **Nunca expor `err.message` ao cliente** — logar no servidor, retornar mensagem genérica
+- **Nunca vazar `ZodError.issues` completo** em produção
+- **Sempre validar input com Zod** antes de qualquer operação no banco
+- **Cookies de sessão: sempre `httpOnly`** — nunca acessível via JS do cliente
+- **Tokens em cookie, nunca em `localStorage`**
+- **SQL parametrizado** — os template literals do `@neondatabase/serverless` já parametrizam automaticamente; nunca concatenar strings em queries
+- **Dados sensíveis no JWT**: apenas `sub` (userId), `role`, `name`, `teamIds`, `mustChangePassword` — nunca dados de negócio
+
+---
+
+## 10. O Que Nunca Fazer
 
 | ❌ Proibido | ✅ Alternativa |
 |------------|---------------|

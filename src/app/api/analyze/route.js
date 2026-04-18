@@ -268,7 +268,14 @@ ${clientData.contextoTemporal === 'Indefinido' ? `REGRAS PARA CONTEXTO INDEFINID
 Agora gere as recomendações finais. REGRAS GERAIS:
 • A mensagem pronta DEVE referenciar algo específico que o cliente disse ou fez nessa conversa. Se for genérica, está errada.
 • O argumento recomendado deve considerar o estado atual (${clientData.perfilMomento}) — não o que funcionaria em geral.
-• O que evitar deve ser específico para ESSE perfil e ESSE contexto temporal, não uma lista genérica.`;
+• O que evitar deve ser específico para ESSE perfil e ESSE contexto temporal, não uma lista genérica.
+
+RESULTADO DA CONVERSA (resultadoSugerido):
+Classifique o desfecho real desta conversa com base apenas no que aconteceu, não no que pode acontecer.
+• fechada: há evidência explícita de fechamento nesta conversa ("fechado", "pode mandar o boleto", pagamento confirmado, contrato assinado).
+• perdida: há evidência explícita de perda ("vou pensar e nunca mais respondeu após várias tentativas", "fui para outra empresa", cliente recusou definitivamente).
+• em_andamento: qualquer outro caso — proposta aberta, cliente ainda avaliando, conversa ativa, follow-up pendente, sem desfecho claro.
+Na dúvida, classifique como em_andamento.`;
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────

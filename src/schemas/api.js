@@ -26,6 +26,10 @@ export const saveRescueSchema = z.object({
   rescuePlan: z.record(z.unknown()),
 });
 
+export const updateResultadoSchema = z.object({
+  resultado: z.enum(['fechada', 'perdida', 'em_andamento']),
+});
+
 // Generics reutilizáveis
 export const paginationSchema = z.object({
   page:  z.coerce.number().int().min(1).default(1),

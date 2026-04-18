@@ -186,4 +186,11 @@ export const sirSchema = z.object({
     comportamento: z.string().describe('O que não fazer.'),
     motivo: z.string().describe('Por que isso especificamente afasta ESSE cliente com ESSE perfil.'),
   })).min(2).max(4),
+
+  resultadoSugerido: z.enum(['fechada', 'perdida', 'em_andamento']).describe(
+    'Resultado desta conversa com base nas evidências concretas. ' +
+    'fechada = venda explicitamente concluída nesta conversa (pagamento confirmado, contrato assinado, "pode mandar o boleto", "fechado"). ' +
+    'perdida = venda explicitamente encerrada (cliente disse não, foi para concorrente, cancelou, ghosting definitivo após última tentativa). ' +
+    'em_andamento = qualquer outro caso — conversa ativa, proposta aberta, follow-up pendente, cliente ainda avaliando.'
+  ),
 });

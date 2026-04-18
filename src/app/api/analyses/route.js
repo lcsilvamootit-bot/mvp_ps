@@ -1,6 +1,6 @@
 import { createAnalysis, listAnalyses } from '@/lib/repositories/analyses';
 import { saveAnalysisSchema, paginationSchema } from '@/schemas/api';
-import { verifySessionToken, getSessionFromRequest } from '@/lib/auth';
+import { verifySessionToken, getSessionFromRequest, isAuthenticated } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +24,10 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  if (!await isAuthenticated(request)) {
+    return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+  }
+
   const body = await request.json();
   const parsed = saveAnalysisSchema.safeParse(body);
   if (!parsed.success) {

@@ -68,3 +68,26 @@ export function getSessionFromRequest(request) {
   const match = raw.match(new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]+)`));
   return match ? match[1] : null;
 }
+
+/**
+ * Verifica se o request tem um access_token válido (guarda do vendedor).
+ * Se ACCESS_TOKEN não estiver configurado, libera (modo dev/sem restrição).
+ */
+export function checkAccessToken(request) {
+  const validToken = process.env.ACCESS_TOKEN;
+  if (!validToken) return true;
+  const raw = request.headers?.get?.('cookie') ?? '';
+  const match = raw.match(/(?:^|;\s*)access_token=([^;]+)/);
+  const cookie = request.cookies?.get?.('access_token')?.value ?? match?.[1] ?? null;
+  const header = request.headers?.get?.('x-access-token') ?? null;
+  return cookie === validToken || header === validToken;
+}
+
+/**
+ * Retorna true se o request tem sessão de psicólogo válida OU access_token de vendedor.
+ * Usar nos endpoints acessíveis a ambos os perfis.
+ */
+export async function isAuthenticated(request) {
+  if (checkAccessToken(request)) return true;
+  return verifySessionToken(getSessionFromRequest(request));
+}

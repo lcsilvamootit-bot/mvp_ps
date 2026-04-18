@@ -50,6 +50,19 @@ export async function saveRescuePlan(id, rescuePlan) {
   return rows.length > 0;
 }
 
+export async function updateAnalysisResultado(id, resultado) {
+  const sql = getDb();
+  const registradoEm = resultado !== 'em_andamento' ? new Date().toISOString() : null;
+  const rows = await sql`
+    UPDATE analyses
+    SET resultado = ${resultado},
+        resultado_registrado_em = ${registradoEm}
+    WHERE id = ${id} AND deleted_at IS NULL
+    RETURNING id
+  `;
+  return rows.length > 0;
+}
+
 export async function findAnalysisById(id) {
   const sql = getDb();
   const rows = await sql`

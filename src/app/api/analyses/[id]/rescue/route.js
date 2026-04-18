@@ -1,9 +1,14 @@
 import { saveRescuePlan } from '@/lib/repositories/analyses';
 import { saveRescueSchema, uuidParamSchema } from '@/schemas/api';
+import { isAuthenticated } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
 export async function POST(request, { params }) {
+  if (!await isAuthenticated(request)) {
+    return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+  }
+
   const { id } = await params;
 
   const idParsed = uuidParamSchema.safeParse({ id });

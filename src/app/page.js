@@ -166,10 +166,23 @@ function AderenciaBadge({ aderencia }) {
 
 // ── Resultado da venda ────────────────────────────────────────────────────────
 
-function ResultadoButtons({ onFechada, onPerdida, isSaving }) {
+const RESULTADO_SUGERIDO_CONFIG = {
+  fechada:       { label: 'IA identificou: Venda fechada',   className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  perdida:       { label: 'IA identificou: Venda perdida',   className: 'bg-red-50 text-red-700 border-red-200' },
+  em_andamento:  { label: 'IA identificou: Em andamento',    className: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+};
+
+function ResultadoButtons({ onFechada, onPerdida, isSaving, resultadoSugerido, saveError }) {
+  const sugestao = resultadoSugerido ? RESULTADO_SUGERIDO_CONFIG[resultadoSugerido] : null;
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
+    <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+      {sugestao && (
+        <div className={`flex items-center justify-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg border ${sugestao.className}`}>
+          {sugestao.label}
+          <span className="font-normal opacity-70">— confirme ou corrija abaixo</span>
+        </div>
+      )}
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">
         Como terminou esse atendimento?
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -243,7 +256,7 @@ function VendaFechadaBand({ clientData, vendorData, signalsData, sirData }) {
   );
 }
 
-function VendaPerdidaBand({ rescueData, rescueLoading }) {
+function VendaPerdidaBand({ rescueData, rescueLoading, rescueError }) {
   return (
     <div className="rounded-2xl border border-red-100 bg-red-50/30 overflow-hidden">
       <div className="px-5 pt-5 pb-3">
@@ -255,6 +268,13 @@ function VendaPerdidaBand({ rescueData, rescueLoading }) {
             {[75, 55, 80, 60].map((w, i) => (
               <div key={i} className="h-3 bg-red-100 rounded animate-pulse" style={{ width: `${w}%` }} />
             ))}
+          </div>
+        )}
+
+        {rescueError && (
+          <div className="flex items-start gap-2 text-sm text-red-600 bg-white border border-red-200 rounded-xl px-4 py-3">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{rescueError}</span>
           </div>
         )}
 
@@ -818,6 +838,7 @@ export default function Home() {
   const [clienteRef, setClienteRef]     = useState('');
   const [analysisId, setAnalysisId]     = useState(null);
   const [isSaving, setIsSaving]         = useState(false);
+  const [saveError, setSaveError]       = useState(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [steps, setSteps] = useState([]);
@@ -827,6 +848,7 @@ export default function Home() {
   const [resultado, setResultado]   = useState(null); // null | 'fechada' | 'perdida'
   const [rescueData, setRescueData] = useState(null);
   const [rescueLoading, setRescueLoading] = useState(false);
+  const [rescueError, setRescueError] = useState(null);
 
   const [clientData, setClientData]   = useState(null);
   const [vendorData, setVendorData]   = useState(null);
@@ -864,7 +886,13 @@ export default function Home() {
     setClientData(null); setVendorData(null); setSignalsData(null); setSirData(null);
     setLoading({ client: false, vendor: false, signals: false, sir: false });
     setFileErrors([]);
+    setSaveError(null);
+    setAnalysisId(null);
+    setResultado(null);
     setDetailMode(false);
+
+    // Cópias locais para uso no auto-save (não dependem de flush de estado React)
+    let _clientData = null, _vendorData = null, _signalsData = null, _sirData = null;
 
     const formData = new FormData();
     files.forEach(f => formData.append('files', f));
@@ -907,21 +935,26 @@ export default function Home() {
 
             if (ev.event === 'client') {
               if (ev.status === 'processing') setLoading(l => ({ ...l, client: true }));
-              if (ev.status === 'done') { setLoading(l => ({ ...l, client: false })); setClientData(ev.data); }
+              if (ev.status === 'done') { _clientData = ev.data; setLoading(l => ({ ...l, client: false })); setClientData(ev.data); }
             }
             if (ev.event === 'vendor') {
               if (ev.status === 'processing') setLoading(l => ({ ...l, vendor: true }));
-              if (ev.status === 'done') { setLoading(l => ({ ...l, vendor: false })); setVendorData(ev.data); }
+              if (ev.status === 'done') { _vendorData = ev.data; setLoading(l => ({ ...l, vendor: false })); setVendorData(ev.data); }
             }
             if (ev.event === 'signals') {
               if (ev.status === 'processing') setLoading(l => ({ ...l, signals: true }));
-              if (ev.status === 'done') { setLoading(l => ({ ...l, signals: false })); setSignalsData(ev.data); }
+              if (ev.status === 'done') { _signalsData = ev.data; setLoading(l => ({ ...l, signals: false })); setSignalsData(ev.data); }
             }
             if (ev.event === 'sir') {
               if (ev.status === 'processing') setLoading(l => ({ ...l, sir: true }));
-              if (ev.status === 'done') { setLoading(l => ({ ...l, sir: false })); setSirData(ev.data); }
+              if (ev.status === 'done') { _sirData = ev.data; setLoading(l => ({ ...l, sir: false })); setSirData(ev.data); }
             }
-            if (ev.event === 'done')  setIsProcessing(false);
+            if (ev.event === 'done') {
+              setIsProcessing(false);
+              if (_clientData && _vendorData && _signalsData && _sirData) {
+                autoSave(_clientData, _vendorData, _signalsData, _sirData);
+              }
+            }
             if (ev.event === 'error') setIsProcessing(false);
           } catch { /* fragmento malformado */ }
         }
@@ -933,8 +966,65 @@ export default function Home() {
     }
   };
 
-  const saveAnalysis = async (resultado) => {
+  // Salva análise nova (POST) — usado no auto-save e como fallback
+  const autoSave = async (cData, vData, sData, sirD) => {
     setIsSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch('/api/analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          corretorNome: corretorNome || undefined,
+          clienteRef:   clienteRef   || undefined,
+          conversaRaw:  rawText || '[conversa via arquivo de mídia]',
+          resultado:    sirD.resultadoSugerido,
+          clientData:   cData,
+          vendorData:   vData,
+          signalsData:  sData,
+          sirData:      sirD,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalysisId(data.id);
+        return data.id;
+      }
+      setSaveError('Não foi possível salvar a análise.');
+    } catch (err) {
+      console.error('[autoSave]', err);
+      setSaveError('Erro de conexão ao salvar.');
+    } finally {
+      setIsSaving(false);
+    }
+    return null;
+  };
+
+  // Atualiza resultado de análise já salva (PATCH)
+  const updateResultado = async (id, resultado) => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/analyses/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ resultado }),
+      });
+      if (!res.ok) setSaveError('Não foi possível atualizar o resultado.');
+    } catch (err) {
+      console.error('[updateResultado]', err);
+      setSaveError('Erro de conexão ao atualizar.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Fallback: salva do zero se o auto-save falhou
+  const saveAnalysisFallback = async (resultado) => {
+    setIsSaving(true);
+    setSaveError(null);
     try {
       const res = await fetch('/api/analyses', {
         method: 'POST',
@@ -956,8 +1046,10 @@ export default function Home() {
         setAnalysisId(data.id);
         return data.id;
       }
+      setSaveError('Não foi possível salvar a análise.');
     } catch (err) {
-      console.error('[saveAnalysis]', err);
+      console.error('[saveAnalysisFallback]', err);
+      setSaveError('Erro de conexão ao salvar.');
     } finally {
       setIsSaving(false);
     }
@@ -966,14 +1058,24 @@ export default function Home() {
 
   const handleVendaFechada = async () => {
     setResultado('fechada');
-    await saveAnalysis('fechada');
+    if (analysisId) {
+      await updateResultado(analysisId, 'fechada');
+    } else {
+      await saveAnalysisFallback('fechada');
+    }
   };
 
   const handleVendaPerdida = async () => {
     setResultado('perdida');
     setRescueLoading(true);
+    setRescueError(null);
 
-    const savedId = await saveAnalysis('perdida');
+    let savedId = analysisId;
+    if (savedId) {
+      await updateResultado(savedId, 'perdida');
+    } else {
+      savedId = await saveAnalysisFallback('perdida');
+    }
 
     try {
       const res = await fetch('/api/rescue', {
@@ -982,21 +1084,25 @@ export default function Home() {
         credentials: 'include',
         body: JSON.stringify({ clientData, vendorData, signalsData, conversa: rawText }),
       });
-      if (res.ok) {
-        const rescue = await res.json();
-        setRescueData(rescue);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setRescueError(err.error ?? 'Não foi possível gerar o plano de resgate. Tente novamente.');
+        return;
+      }
+      const rescue = await res.json();
+      setRescueData(rescue);
 
-        if (savedId) {
-          await fetch(`/api/analyses/${savedId}/rescue`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ rescuePlan: rescue }),
-          }).catch(err => console.error('[saveRescuePlan]', err));
-        }
+      if (savedId) {
+        await fetch(`/api/analyses/${savedId}/rescue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ rescuePlan: rescue }),
+        }).catch(err => console.error('[saveRescuePlan]', err));
       }
     } catch (err) {
       console.error('[rescue]', err);
+      setRescueError('Erro de conexão ao gerar o plano de resgate. Verifique sua internet.');
     } finally {
       setRescueLoading(false);
     }
@@ -1008,8 +1114,10 @@ export default function Home() {
     setLoading({ client: false, vendor: false, signals: false, sir: false });
     setDetailMode(false);
     setResultado(null);
+    setSaveError(null);
     setRescueData(null);
     setRescueLoading(false);
+    setRescueError(null);
     setAnalysisId(null);
     setIsSaving(false);
     // mantém corretorNome e clienteRef — usuário provavelmente fará outra análise
@@ -1052,6 +1160,13 @@ export default function Home() {
           </div>
         ))}
 
+        {/* Erro de save/update — visível independente do estado dos botões */}
+        {saveError && (
+          <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /><span>{saveError}</span>
+          </div>
+        )}
+
         {/* Steps — while processing, before first result */}
         {steps.length > 0 && isProcessing && !clientData && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-2.5">
@@ -1089,6 +1204,8 @@ export default function Home() {
             onFechada={handleVendaFechada}
             onPerdida={handleVendaPerdida}
             isSaving={isSaving}
+            resultadoSugerido={sirData?.resultadoSugerido}
+            saveError={saveError}
           />
         )}
 
@@ -1107,6 +1224,7 @@ export default function Home() {
           <VendaPerdidaBand
             rescueData={rescueData}
             rescueLoading={rescueLoading}
+            rescueError={rescueError}
           />
         )}
 
