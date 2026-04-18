@@ -17,7 +17,7 @@ CREATE TYPE nota_avaliacao    AS ENUM ('Acertou', 'Parcial', 'Errou');
 CREATE TYPE nivel_risco       AS ENUM ('Alta', 'Média', 'Baixa');
 CREATE TYPE nivel_aderencia   AS ENUM ('Alta', 'Média', 'Baixa');
 CREATE TYPE avaliacao_psico   AS ENUM ('correto', 'parcialmente', 'errado');
-CREATE TYPE user_role         AS ENUM ('gestor', 'vendedor');
+CREATE TYPE user_role         AS ENUM ('gestor', 'vendedor', 'psicologo');
 CREATE TYPE auth_token_type   AS ENUM ('invite', 'reset');
 
 -- ── users (vazia no V1 — usada no V2) ────────────────────────
@@ -37,7 +37,7 @@ CREATE TABLE users (
 CREATE TABLE teams (
   id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
   name       TEXT        NOT NULL,
-  gestor_id  UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  gestor_id  UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

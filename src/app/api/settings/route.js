@@ -1,17 +1,18 @@
 import { getWorkspaceContext, saveWorkspaceContext } from '@/lib/workspace';
-import { verifySessionToken, getSessionFromRequest } from '@/lib/auth';
+import { verifyJwt, getJwtFromRequest } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
-async function requirePsychSession(request) {
-  const token = getSessionFromRequest(request);
-  const valid = await verifySessionToken(token);
-  if (!valid) return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+async function requirePsicologo(request) {
+  const session = await verifyJwt(getJwtFromRequest(request));
+  if (!session || session.role !== 'psicologo') {
+    return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+  }
   return null;
 }
 
 export async function GET(request) {
-  const denied = await requirePsychSession(request);
+  const denied = await requirePsicologo(request);
   if (denied) return denied;
 
   try {
@@ -24,7 +25,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const denied = await requirePsychSession(request);
+  const denied = await requirePsicologo(request);
   if (denied) return denied;
 
   try {

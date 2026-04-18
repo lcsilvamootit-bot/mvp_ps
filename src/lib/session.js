@@ -25,12 +25,14 @@ export async function verifyJwt(token) {
   }
 }
 
+const SECURE = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+
 export function sessionCookieHeader(token) {
-  return `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600`;
+  return `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600${SECURE}`;
 }
 
 export function clearSessionCookieHeader() {
-  return `session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+  return `session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${SECURE}`;
 }
 
 export function getJwtFromRequest(request) {

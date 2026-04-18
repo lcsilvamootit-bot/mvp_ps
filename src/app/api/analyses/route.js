@@ -1,19 +1,13 @@
 import { createAnalysis, listAnalyses } from '@/lib/repositories/analyses';
 import { saveAnalysisSchema, paginationSchema } from '@/schemas/api';
-import { verifySessionToken, getSessionFromRequest } from '@/lib/auth';
 import { verifyJwt, getJwtFromRequest } from '@/lib/session';
 import { getTeamMemberIds } from '@/lib/repositories/users';
 
 export const runtime = 'nodejs';
 
 export async function GET(request) {
-  const psychToken = getSessionFromRequest(request);
-  const isPsych = await verifySessionToken(psychToken);
-
-  const jwtToken = getJwtFromRequest(request);
-  const jwtSession = isPsych ? null : await verifyJwt(jwtToken);
-
-  if (!isPsych && !jwtSession) {
+  const jwtSession = await verifyJwt(getJwtFromRequest(request));
+  if (!jwtSession) {
     return Response.json({ error: 'Não autorizado.' }, { status: 401 });
   }
 
@@ -25,11 +19,12 @@ export async function GET(request) {
   const pendente = searchParams.get('pendente') === 'true';
 
   let userIds = null;
-  if (jwtSession?.role === 'vendedor') {
+  if (jwtSession.role === 'vendedor') {
     userIds = [jwtSession.sub];
-  } else if (jwtSession?.role === 'gestor') {
+  } else if (jwtSession.role === 'gestor') {
     userIds = await getTeamMemberIds(jwtSession.teamIds ?? []);
   }
+  // psicologo: userIds permanece null → vê todas
 
   try {
     const analyses = await listAnalyses({ pendente, ...paginationParsed.data, userIds });
@@ -50,7 +45,6 @@ export async function POST(request) {
   const { corretorNome, clienteRef, conversaRaw, resultado,
           clientData, vendorData, signalsData, sirData } = parsed.data;
 
-  // Extrai user_id do JWT se o vendedor estiver autenticado
   const jwtToken = getJwtFromRequest(request);
   const jwtSession = await verifyJwt(jwtToken);
   const userId = jwtSession?.role === 'vendedor' ? jwtSession.sub : null;

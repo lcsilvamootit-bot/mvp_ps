@@ -1,12 +1,12 @@
 import { findAnalysisById } from '@/lib/repositories/analyses';
 import { uuidParamSchema } from '@/schemas/api';
-import { verifySessionToken, getSessionFromRequest } from '@/lib/auth';
+import { verifyJwt, getJwtFromRequest } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
 export async function GET(request, { params }) {
-  const token = getSessionFromRequest(request);
-  if (!await verifySessionToken(token)) {
+  const session = await verifyJwt(getJwtFromRequest(request));
+  if (!session || session.role !== 'psicologo') {
     return Response.json({ error: 'Não autorizado.' }, { status: 401 });
   }
 

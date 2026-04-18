@@ -6,7 +6,7 @@ export async function createUser({ name, email, role = 'vendedor' }) {
   const sql = getDb();
   const rows = await sql`
     INSERT INTO users (name, email, role, must_change_password)
-    VALUES (${name}, ${email}, ${role}, true)
+    VALUES (${name}, ${email.toLowerCase()}, ${role}, true)
     RETURNING id, name, email, role, active, must_change_password, created_at
   `;
   return toCamel(rows[0]);
@@ -77,16 +77,12 @@ export async function getTeamMemberIds(teamIds) {
 
 export async function ensureGestorTeam(gestorId) {
   const sql = getDb();
-  const existing = await sql`
-    SELECT id FROM teams WHERE gestor_id = ${gestorId} LIMIT 1
-  `;
-  if (existing.length > 0) return existing[0].id;
-
-  const rows = await sql`
+  await sql`
     INSERT INTO teams (name, gestor_id)
-    VALUES (${'Minha Equipe'}, ${gestorId})
-    RETURNING id
+    VALUES ('Minha Equipe', ${gestorId})
+    ON CONFLICT (gestor_id) DO NOTHING
   `;
+  const rows = await sql`SELECT id FROM teams WHERE gestor_id = ${gestorId} LIMIT 1`;
   return rows[0].id;
 }
 

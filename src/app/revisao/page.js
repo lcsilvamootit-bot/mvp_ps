@@ -39,8 +39,8 @@ export default function RevisaoPage() {
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
+    await fetch('/api/auth/signout', { method: 'POST' });
+    router.push('/acesso');
   };
 
   return (

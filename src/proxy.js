@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { verifyJwt } from '@/lib/session';
-import { verifySessionToken } from '@/lib/auth';
 
 const PUBLIC_PATHS = ['/acesso', '/primeiro-acesso', '/login'];
 
@@ -33,12 +32,12 @@ export async function proxy(request) {
     return NextResponse.next();
   }
 
-  // /revisao/* — requer sessão do psicólogo (HMAC)
+  // /revisao/* — requer JWT com role psicologo
   if (pathname.startsWith('/revisao')) {
-    const token = request.cookies.get('psych_session')?.value ?? null;
-    const valid = await verifySessionToken(token);
-    if (!valid) {
-      return NextResponse.redirect(new URL('/login', request.url));
+    const token = request.cookies.get('session')?.value;
+    const session = await verifyJwt(token);
+    if (!session || session.role !== 'psicologo') {
+      return NextResponse.redirect(new URL('/acesso', request.url));
     }
     return NextResponse.next();
   }

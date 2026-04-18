@@ -50,7 +50,7 @@ export async function POST(request) {
 
     return Response.json({ ...user, inviteToken }, { status: 201 });
   } catch (err) {
-    if (err.message?.includes('unique') || err.message?.includes('duplicate')) {
+    if (err.code === '23505') {
       return Response.json({ error: 'E-mail já cadastrado.' }, { status: 409 });
     }
     console.error('[POST /api/users]', err.message);

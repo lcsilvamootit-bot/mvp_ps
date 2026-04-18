@@ -10,6 +10,7 @@ const schema = z.object({
   name:     z.string().min(1).max(120),
   email:    z.string().email(),
   password: z.string().min(8),
+  role:     z.enum(['gestor', 'psicologo']).default('gestor'),
 });
 
 export async function POST(request) {
@@ -28,17 +29,17 @@ export async function POST(request) {
     return Response.json({ error: 'Chave inválida.' }, { status: 403 });
   }
 
-  if (await gestorExists()) {
+  if (parsed.data.role === 'gestor' && await gestorExists()) {
     return Response.json({ error: 'Gestor já existe.' }, { status: 409 });
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, role } = parsed.data;
   const passwordHash = await bcrypt.hash(password, 12);
   const sql = getDb();
 
   const rows = await sql`
     INSERT INTO users (name, email, password_hash, role, must_change_password)
-    VALUES (${name}, ${email.toLowerCase()}, ${passwordHash}, 'gestor', false)
+    VALUES (${name}, ${email.toLowerCase()}, ${passwordHash}, ${role}, false)
     RETURNING id, name, email, role
   `;
 

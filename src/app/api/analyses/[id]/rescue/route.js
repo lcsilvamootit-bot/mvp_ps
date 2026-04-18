@@ -1,9 +1,13 @@
 import { saveRescuePlan } from '@/lib/repositories/analyses';
 import { saveRescueSchema, uuidParamSchema } from '@/schemas/api';
+import { verifyJwt, getJwtFromRequest } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
 export async function POST(request, { params }) {
+  const session = await verifyJwt(getJwtFromRequest(request));
+  if (!session) return Response.json({ error: 'Não autorizado.' }, { status: 401 });
+
   const { id } = await params;
 
   const idParsed = uuidParamSchema.safeParse({ id });

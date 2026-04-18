@@ -11,6 +11,7 @@ export default function DashboardPage() {
       .then(r => r.json())
       .then(data => {
         if (data.role === 'gestor') router.replace('/dashboard/gestor');
+        else if (data.role === 'psicologo') router.replace('/revisao');
         else router.replace('/dashboard/vendedor');
       })
       .catch(() => router.replace('/acesso'));
