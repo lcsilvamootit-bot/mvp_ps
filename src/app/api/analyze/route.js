@@ -7,6 +7,7 @@ import {
   sirSchema,
 } from '@/schemas';
 import { getWorkspaceContext, buildContextBlock } from '@/lib/workspace';
+import { parseMaxxconnectPdf } from '@/lib/parsers/maxxconnect';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -30,6 +31,9 @@ function isAudio(file) {
 function isVideo(file) {
   const t = resolveType(file);
   return t.startsWith('video/') || !!file.name.match(/\.(mp4|webm|mov)$/i);
+}
+function isPdf(file) {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 }
 async function toWhisperFile(file) {
   const type = resolveType(file);
@@ -312,7 +316,7 @@ export async function POST(request) {
           await send('error', 'error', `"${file.name}" excede 25MB. Comprima ou exporte só o áudio.`);
           return writer.close();
         }
-        if (!isAudio(file) && !isVideo(file) && !file.type.startsWith('text/')) {
+        if (!isAudio(file) && !isVideo(file) && !isPdf(file) && !file.type.startsWith('text/')) {
           await send('error', 'error', `Formato de "${file.name}" não suportado.`);
           return writer.close();
         }
@@ -323,24 +327,87 @@ export async function POST(request) {
         return writer.close();
       }
 
-      const audioFiles = files.filter(isAudio);
-      const videoFiles = files.filter(isVideo);
-      const textFiles  = files.filter(f => !isAudio(f) && !isVideo(f));
-      const summary = [
-        audioFiles.length && `${audioFiles.length} áudio(s)`,
-        videoFiles.length && `${videoFiles.length} vídeo(s)`,
-        textFiles.length  && `${textFiles.length} texto(s)`,
-        rawText           && 'texto colado',
-      ].filter(Boolean).join(', ');
-
-      await send('upload', 'done', `Recebido: ${summary}`);
+      const pdfFile = files.find(isPdf);
 
       // ── Transcrição ──────────────────────────────────────────────────────
       const context = [];
       if (rawText) context.push(`[Texto da conversa]:\n${rawText}`);
 
+      // ── Branch PDF ───────────────────────────────────────────────────────
+      if (pdfFile) {
+        await send('upload', 'processing', `Processando "${pdfFile.name}"...`);
+        let conversaItems;
+        try {
+          const buffer = Buffer.from(await pdfFile.arrayBuffer());
+          conversaItems = await parseMaxxconnectPdf(buffer);
+        } catch (err) {
+          console.error('[pdf-parse]', err.message);
+          await send('error', 'error', `Erro ao processar o PDF "${pdfFile.name}". Verifique se é um export do Maxxconnect.`);
+          return writer.close();
+        }
+
+        const byType = {};
+        for (const it of conversaItems) byType[it.tipo] = (byType[it.tipo] ?? 0) + 1;
+        const participants = [...new Set(conversaItems.map(it => it.remetenteNome))];
+        const pdfMeta = { total: conversaItems.length, byType, participants };
+        const typeSummary = Object.entries(byType).map(([k, v]) => `${v} ${k}`).join(' · ');
+        await send('upload', 'done', `PDF processado — ${conversaItems.length} mensagens (${typeSummary})`, { pdfMeta });
+
+        // ── Transcrição dos áudios OCI ───────────────────────────────────
+        const audioItems = conversaItems.filter(it => it.tipo === 'audio' && it.urlAnexo);
+        if (audioItems.length > 0) {
+          await send('transcribe', 'processing', `Transcrevendo 0/${audioItems.length} áudios...`);
+          let doneCount = 0;
+
+          for (let i = 0; i < audioItems.length; i += 3) {
+            const batch = audioItems.slice(i, i + 3);
+            await Promise.allSettled(batch.map(async (item) => {
+              try {
+                const res = await fetch(item.urlAnexo);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const ab = await res.arrayBuffer();
+                const ext = item.urlAnexo.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'ogg';
+                const mime = EXT_TO_MIME[ext] || 'audio/ogg';
+                const whisperFile = new File([ab], `audio.${ext}`, { type: mime });
+                const resp = await getOpenAI().audio.transcriptions.create({
+                  file: whisperFile, model: 'whisper-1', language: 'pt',
+                });
+                if (resp.text?.trim()?.length >= 5) item.transcricao = resp.text.trim();
+              } catch (err) {
+                console.error('[pdf-transcribe]', item.urlAnexo, err.message);
+              } finally {
+                doneCount++;
+                await send('transcribe', 'processing', `Transcrevendo ${doneCount}/${audioItems.length} áudios...`);
+              }
+            }));
+          }
+
+          const transcribed = audioItems.filter(it => it.transcricao).length;
+          await send('transcribe', 'done', `${transcribed}/${audioItems.length} áudios transcritos`);
+        }
+
+        const lines = conversaItems.map(item => {
+          const who = item.remetenteNome;
+          if (item.tipo === 'texto') return `[${who}]: ${item.conteudo}`;
+          if (item.transcricao)      return `[${who}]: [${item.tipo}] ${item.transcricao}`;
+          return `[${who}]: [${item.tipo}]`;
+        });
+        context.push(`[Conversa importada do CRM Maxxconnect]:\n${lines.join('\n')}`);
+      } else {
+        const audioFiles = files.filter(isAudio);
+        const videoFiles = files.filter(isVideo);
+        const textFiles  = files.filter(f => !isAudio(f) && !isVideo(f));
+        const summary = [
+          audioFiles.length && `${audioFiles.length} áudio(s)`,
+          videoFiles.length && `${videoFiles.length} vídeo(s)`,
+          textFiles.length  && `${textFiles.length} texto(s)`,
+          rawText           && 'texto colado',
+        ].filter(Boolean).join(', ');
+        await send('upload', 'done', `Recebido: ${summary}`);
+      }
+
       for (const file of files) {
-        if (isAudio(file) || isVideo(file)) {
+        if (!pdfFile && (isAudio(file) || isVideo(file))) {
           await send('transcribe', 'processing', `Transcrevendo ${file.name}...`, null, file.name);
           const whisperFile = await toWhisperFile(file);
 
@@ -372,7 +439,7 @@ export async function POST(request) {
           }
           void done;
 
-        } else if (file.type.startsWith('text/')) {
+        } else if (!pdfFile && file.type.startsWith('text/')) {
           await send('transcribe', 'processing', `Lendo ${file.name}...`, null, file.name);
           const text = new TextDecoder('utf-8').decode(await file.arrayBuffer()).trim();
           context.push(`[Texto do arquivo ${file.name}]:\n${text}`);
